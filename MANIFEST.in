@@ -1,0 +1,11 @@
+include LICENSE
+include .pylintrc
+include *.bat
+include *.md
+include requirements.txt
+include requirements-dev.txt
+recursive-include tests *.py
+recursive-include integration_tests *.py *.json *.jpg *.txt
+recursive-include example_data *
+recursive-include notebook *
+exclude *.log *.db *.env

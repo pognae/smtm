@@ -1,5 +1,13 @@
 import unittest
-from smtm import StrategyFactory, StrategyBuyAndHold, StrategySma0, StrategyRsi, StrategySmaMl
+from smtm import (
+    StrategyFactory,
+    StrategyBuyAndHold,
+    StrategySma0,
+    StrategyRsi,
+    StrategySmaMl,
+    StrategyTurtle,
+    StrategyBnf,
+)
 from unittest.mock import *
 
 
@@ -19,6 +27,26 @@ class StrategyFactoryTests(unittest.TestCase):
         self.assertTrue(isinstance(StrategyFactory.create("SMA"), StrategySma0))
         self.assertTrue(isinstance(StrategyFactory.create("RSI"), StrategyRsi))
         self.assertTrue(isinstance(StrategyFactory.create("SML"), StrategySmaMl))
+        self.assertTrue(isinstance(StrategyFactory.create("TUR"), StrategyTurtle))
+        self.assertTrue(isinstance(StrategyFactory.create("BNF"), StrategyBnf))
+        self.assertEqual(StrategyFactory.create("4"), None)
+
+    def test_create_return_legacy_code(self):
+        self.assertTrue(isinstance(StrategyFactory.create(0), StrategyBuyAndHold))
+        self.assertTrue(isinstance(StrategyFactory.create("1"), StrategySma0))
+        self.assertTrue(isinstance(StrategyFactory.create("2"), StrategyRsi))
+        self.assertTrue(isinstance(StrategyFactory.create(3), StrategySmaMl))
+        self.assertEqual(StrategyFactory.get_name("0"), StrategyBuyAndHold.NAME)
+        self.assertEqual(StrategyFactory.get_name(1), StrategySma0.NAME)
+
+    def test_create_keeps_strategy_params_until_initialize(self):
+        strategy = StrategyFactory.create("SMA", params={"short": 5, "mid": 15, "long": 20})
+        self.assertEqual(strategy.SHORT, StrategySma0.SHORT)
+        strategy.initialize(10000)
+        self.assertEqual(strategy.SHORT, 5)
+        self.assertEqual(strategy.MID, 15)
+        self.assertEqual(strategy.LONG, 20)
+        self.assertEqual(StrategySma0.SHORT, 10)
 
     def test_get_name_return_None_when_called_with_invalid_code(self):
         strategy = StrategyFactory.get_name("")
@@ -29,6 +57,8 @@ class StrategyFactoryTests(unittest.TestCase):
         self.assertTrue(StrategyFactory.get_name("SMA"), StrategySma0.NAME)
         self.assertTrue(StrategyFactory.get_name("RSI"), StrategyRsi.NAME)
         self.assertTrue(StrategyFactory.get_name("SML"), StrategySmaMl.NAME)
+        self.assertEqual(StrategyFactory.get_name("TUR"), StrategyTurtle.NAME)
+        self.assertEqual(StrategyFactory.get_name("bnf"), StrategyBnf.NAME)
 
     def test_get_all_strategy_info_return_correct_info(self):
         all = StrategyFactory.get_all_strategy_info()
@@ -44,3 +74,6 @@ class StrategyFactoryTests(unittest.TestCase):
         self.assertTrue(all[3]["name"], StrategySmaMl.NAME)
         self.assertTrue(all[3]["code"], StrategySmaMl.CODE)
         self.assertTrue(all[3]["class"], StrategySmaMl)
+        self.assertEqual(all[4]["code"], "TUR")
+        self.assertEqual(all[5]["code"], "BNF")
+        self.assertEqual(len(all), 6)

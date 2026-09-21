@@ -651,3 +651,30 @@ class BithumbTraderBasicTests(unittest.TestCase):
         expected_data = "endpoint=get%2Fapple&order_currency=apple&payment_currency=KRW"
 
         self.assertEqual(trader.bithumb_api_call("get/apple", dummy_query), None)
+
+    def test_fetch_account_should_cap_balance_with_available_krw(self):
+        trader = BithumbTrader(budget=100000, currency="BTC")
+        trader._query_balance = MagicMock(
+            return_value={
+                "status": "0000",
+                "data": {"available_krw": "40000", "available_btc": "0.02"},
+            }
+        )
+        account = trader.fetch_account()
+        self.assertEqual(account["balance"], 40000)
+        self.assertEqual(account["asset_amount"], 0.02)
+        self.assertEqual(trader.asset, (0, 0.02))
+
+    def test_fetch_account_return_None_when_query_failed(self):
+        trader = BithumbTrader()
+        trader._query_balance = MagicMock(return_value={"status": "5100"})
+        self.assertEqual(trader.fetch_account(), None)
+
+    def test_cancel_open_orders_should_cancel_each_order_id(self):
+        trader = BithumbTrader(currency="BTC")
+        trader._query_open_orders = MagicMock(
+            return_value={"status": "0000", "data": [{"order_id": "1"}, {"order_id": "2"}]}
+        )
+        trader._cancel_order = MagicMock()
+        trader.cancel_open_orders()
+        self.assertEqual(trader._cancel_order.call_count, 2)

@@ -36,6 +36,7 @@ class UpbitTrader(Trader):
         "XRP": ("KRW-XRP", "XRP"),
     }
     NAME = "Upbit"
+    SUPPORTS_ACCOUNT_SYNC = True
 
     def __init__(self, budget=50000, currency="BTC", commission_ratio=0.0005, opt_mode=True):
         if currency not in self.AVAILABLE_CURRENCY:
@@ -51,6 +52,7 @@ class UpbitTrader(Trader):
         self.SERVER_URL = os.environ.get("UPBIT_OPEN_API_SERVER_URL", "upbit_server_url")
         self.is_opt_mode = opt_mode
         self.asset = (0, 0)  # avr_price, amount
+        self.budget_limit = budget
         self.balance = budget
         self.commission_ratio = commission_ratio
         currency_info = self.AVAILABLE_CURRENCY[currency]
@@ -183,6 +185,56 @@ class UpbitTrader(Trader):
         orders = copy.deepcopy(self.order_map)
         for request_id in orders.keys():
             self.cancel_request(request_id)
+
+    def cancel_open_orders(self):
+        """이 트레이더 마켓의 미체결 주문만 취소한다"""
+        orders = self._query_open_orders()
+        if not isinstance(orders, list):
+            self.logger.error("open order query failed")
+            return
+
+        for order in orders:
+            if order.get("market") != self.market:
+                continue
+            order_uuid = order.get("uuid")
+            if order_uuid:
+                self._cancel_order(order_uuid)
+
+    def fetch_account(self):
+        """거래소 계좌를 읽어 사용 가능한 원화와 코인 수량을 맞춘다
+
+        원화는 budget과 거래소 주문 가능 금액 중 작은 값만 사용한다.
+        조회 실패 시 None.
+        """
+        accounts = self._query_account()
+        if not isinstance(accounts, list):
+            self.logger.error("account query failed")
+            return None
+
+        krw = 0.0
+        amount = 0.0
+        avg_price = 0.0
+        for item in accounts:
+            currency = item.get("currency")
+            if currency == "KRW":
+                krw = float(item.get("balance") or 0)
+            elif currency == self.market_currency:
+                amount = float(item.get("balance") or 0)
+                avg_price = float(item.get("avg_buy_price") or 0)
+
+        self.balance = min(self.budget_limit, krw)
+        self.asset = (avg_price, amount)
+        self.logger.info(
+            f"account synced balance: {self.balance}, asset: {amount}, avg: {avg_price}"
+        )
+        return {"balance": self.balance, "asset_amount": amount, "avg_price": avg_price}
+
+    def _query_open_orders(self):
+        """해당 마켓의 대기 주문을 조회한다"""
+        query_string = f"market={self.market}&states[]=wait".encode()
+        jwt_token = self._create_jwt_token(self.ACCESS_KEY, self.SECRET_KEY, query_string)
+        headers = {"Authorization": "Bearer {}".format(jwt_token)}
+        return self._request_get(self.SERVER_URL + "/v1/orders", params=query_string, headers=headers)
 
     def get_trade_tick(self):
         """최근 거래 정보 조회"""

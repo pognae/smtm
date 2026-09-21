@@ -427,6 +427,27 @@ class VirtualMarketTests(unittest.TestCase):
         info = market.get_balance()
         self.assertEqual(info, None)
 
+    def test_handle_request_buy_applies_slippage_to_fill_price(self):
+        market = VirtualMarket(slippage_ratio=0.01)
+        market.data = self.get_mango_data()
+        market.is_initialized = True
+        market.balance = 2000
+        market.commission_ratio = 0.05
+
+        for i in range(3):
+            market.data[i]["opening_price"] = 2000.00000000
+            market.data[i]["high_price"] = 2100.00000000
+            market.data[i]["low_price"] = 1900.00000000
+            market.data[i]["closing_price"] = 2050.00000000
+            market.data[i]["date_time"] = "2020-02-27T00:00:59"
+
+        dummy_request = {"id": "mango", "type": "buy", "price": 2000, "amount": 0.1}
+        result = market.handle_request(dummy_request)
+        self.assertEqual(result["price"], 2020)
+        self.assertEqual(result["amount"], 0.1)
+        self.assertEqual(result["balance"], 1788)
+        self.assertEqual(result["msg"], "success")
+
     @staticmethod
     def get_mango_data():
         return [

@@ -27,6 +27,8 @@
  --- 반복 ---
 4. Analyzer 모듈을 통한 분석
 
+전략 코드는 `BNH`(분할 매수 후 보유), `SMA`(이평 정배열), `RSI`(과매도·과매수), `SML`(이평과 기울기), `TUR`(고점 돌파 현물), `BNF`(고점 대비 급락 매수)다. 기본값은 `BNH`다.
+
 ❗ 초 단위의 짧은 시간에 많은 거래를 처리해야하는 고성능 트레이딩 머신으로는 적합하지 않으며, 처리 시간이 중요한 성능이 요구되는 경우 충분한 검토가 필요합니다.
 
 ![intro](https://user-images.githubusercontent.com/9311990/140635409-93e4b678-5a6b-40b8-8e28-5c8f819aa88c.jpg)
@@ -84,14 +86,14 @@ python -m smtm --mode 0
 시뮬레이션 파라미터와 함께 아래 명령어로 단일 시뮬레이션을 실행하면 결과를 반환합니다.
 
 ```
-python -m smtm --mode 1 --budget 500000 --from_dash_to 201220.080000-201221 --term 0.001 --strategy 1 --currency BTC
+python -m smtm --mode 1 --budget 500000 --from_dash_to 201220.080000-201221 --term 0.001 --strategy SMA --currency BTC
 ```
 
 ### 기본 실전 매매 프로그램
 아래 명령어로 초기값과 함께 기본 실전 매매 프로그램을 실행합니다. 기본 실전 매매 프로그램은 인터렉티브 모드로 실행되어 입력에 따라 거래 시작, 중지, 결과 조회가 가능합니다.
 
 ```
-python -m smtm --mode 2 --budget 100000 --term 60 --strategy 0 --currency ETH
+python -m smtm --mode 2 --budget 100000 --term 60 --strategy BNH --currency ETH
 ```
 
 실전 거래를 위해서는 `.env` 파일에 거래소 API KEY와 API host url을 넣어 주어야 합니다.
@@ -127,7 +129,7 @@ python -m smtm --mode 4 --config /data/sma0_simulation.json
 파라미터와 함께 아래 명령어로 대량 시뮬레이션에 사용될 설정 파일을 생성할 수 있습니다.
 
 ```
-python -m smtm --mode 5 --budget 50000 --title SMA_6H_week --strategy 1 --currency ETH --from_dash_to 210804.000000-210811.000000 --offset 360 --file generated_config.json
+python -m smtm --mode 5 --budget 50000 --title SMA_6H_week --strategy SMA --currency ETH --from_dash_to 210804.000000-210811.000000 --offset 360 --file generated_config.json
 ```
 
 ## 소프트웨어 설계구조

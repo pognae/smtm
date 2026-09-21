@@ -10,6 +10,7 @@ from .bithumb_trader import BithumbTrader
 from .bithumb_data_provider import BithumbDataProvider
 from .strategy_factory import StrategyFactory
 from .operator import Operator
+from .demo_trader import DemoTrader
 
 
 class Controller:
@@ -24,21 +25,26 @@ class Controller:
         budget=50000,
         currency="BTC",
         is_bithumb=False,
+        is_demo=False,
+        strategy_params=None,
+        max_loss=0,
     ):
         self.logger = LogManager.get_logger("Controller")
         self.terminating = False
         self.interval = float(interval)
-        self.operator = Operator()
+        self.max_loss = max_loss or 0
+        self.operator = Operator(max_loss=self.max_loss)
         self.budget = int(budget)
         self.is_initialized = False
         self.command_list = []
         self.create_command()
         self.is_bithumb = is_bithumb
+        self.is_demo = is_demo
         self.strategy = None
         self.currency = currency
         LogManager.set_stream_level(Config.operation_log_level)
 
-        self.strategy = StrategyFactory.create(strategy)
+        self.strategy = StrategyFactory.create(strategy, params=strategy_params)
         if self.strategy is None:
             raise UserWarning(f"Invalid Strategy! {strategy}")
 
@@ -75,7 +81,11 @@ class Controller:
     def main(self):
         """시작점이 되는 main 함수"""
 
-        if self.is_bithumb:
+        if self.is_demo:
+            print("$$$ THIS IS DEMO MODE $$$")
+            data_provider = UpbitDataProvider(currency=self.currency, interval=Config.candle_interval)
+            trader = DemoTrader(currency=self.currency, budget=self.budget)
+        elif self.is_bithumb:
             data_provider = BithumbDataProvider(currency=self.currency)
             trader = BithumbTrader(currency=self.currency, budget=self.budget)
         else:
@@ -89,6 +99,8 @@ class Controller:
             Analyzer(),
             budget=self.budget,
         )
+        if getattr(self.operator, "account_sync_failed", False) is True:
+            print("계좌 조회에 실패해서 자동매매를 시작할 수 없습니다. API 키를 확인하세요.")
 
         self.operator.set_interval(self.interval)
         print("##### smtm is intialized #####")

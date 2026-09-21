@@ -117,7 +117,18 @@ class MassSimulator:
         return last_report
 
     @staticmethod
-    def get_initialized_operator(budget, strategy_code, interval, currency, start, end, tag):
+    def get_initialized_operator(
+        budget,
+        strategy_code,
+        interval,
+        currency,
+        start,
+        end,
+        tag,
+        strategy_params=None,
+        slippage=0,
+        max_loss=0,
+    ):
         """시뮬레이션 오퍼레이션 생성 후 주어진 설정 값으로 초기화 하여 반환"""
         dt = DateConverter.to_end_min(
             start_iso=start, end_iso=end, interval_min=Config.candle_interval / 60
@@ -127,18 +138,20 @@ class MassSimulator:
         data_provider = SimulationDataProvider(currency=currency, interval=Config.candle_interval)
         data_provider.initialize_simulation(end=end, count=count)
 
-        strategy = StrategyFactory.create(strategy_code)
+        strategy = StrategyFactory.create(strategy_code, params=strategy_params)
         if strategy is None:
             raise UserWarning(f"Invalid Strategy! {strategy_code}")
 
         strategy.is_simulation = True
-        trader = SimulationTrader(currency=currency, interval=Config.candle_interval)
+        trader = SimulationTrader(
+            currency=currency, interval=Config.candle_interval, slippage_ratio=slippage
+        )
         trader.initialize_simulation(end=end, count=count, budget=budget)
 
         analyzer = Analyzer()
         analyzer.is_simulation = True
 
-        operator = SimulationOperator(periodic_record_enable=False)
+        operator = SimulationOperator(periodic_record_enable=False, max_loss=max_loss)
         operator.initialize(
             data_provider,
             strategy,
@@ -176,6 +189,9 @@ class MassSimulator:
                     "currency": self.config["currency"],
                     "partial_idx": i,
                     "partial_period_list": separated_periods[i],
+                    "strategy_params": self.config.get("strategy_params"),
+                    "slippage": self.config.get("slippage", 0),
+                    "max_loss": self.config.get("max_loss", 0),
                 }
             )
 
@@ -236,6 +252,9 @@ class MassSimulator:
                     period["period"]["start"],
                     period["period"]["end"],
                     tag,
+                    strategy_params=config.get("strategy_params"),
+                    slippage=config.get("slippage", 0),
+                    max_loss=config.get("max_loss", 0),
                 )
                 report = MassSimulator.run_single(operator)
                 result_list.append({"idx": period["idx"], "result": report})

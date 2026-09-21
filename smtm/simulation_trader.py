@@ -18,11 +18,15 @@ class SimulationTrader(Trader):
     AVAILABLE_CURRENCY = {"BTC": "KRW-BTC", "ETH": "KRW-ETH", "DOGE": "KRW-DOGE", "XRP": "KRW-XRP"}
     NAME = "Simulation"
 
-    def __init__(self, currency="BTC", interval=60):
+    def __init__(self, currency="BTC", interval=60, slippage_ratio=0):
         if currency not in self.AVAILABLE_CURRENCY:
             raise UserWarning(f"not supported currency: {currency}")
         self.logger = LogManager.get_logger(__class__.__name__)
-        self.market = VirtualMarket(market=self.AVAILABLE_CURRENCY[currency], interval=interval)
+        self.market = VirtualMarket(
+            market=self.AVAILABLE_CURRENCY[currency],
+            interval=interval,
+            slippage_ratio=slippage_ratio,
+        )
         self.is_initialized = False
 
     def initialize_simulation(self, end, count, budget):

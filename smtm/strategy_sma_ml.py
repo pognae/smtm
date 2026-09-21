@@ -70,6 +70,16 @@ class StrategySmaMl(Strategy):
         if self.is_intialized:
             return
 
+        self.apply_params(
+            {
+                "short": "SHORT",
+                "mid": "MID",
+                "long": "LONG",
+                "lr_count": "LR_COUNT",
+                "waiting_stable": "WAITING_STABLE",
+                "commission_ratio": "COMMISSION_RATIO",
+            }
+        )
         self.is_intialized = True
         self.budget = budget
         self.balance = budget

@@ -188,6 +188,7 @@ class StrategyBuyAndHold(Strategy):
         if self.is_intialized:
             return
 
+        self.apply_params({"commission_ratio": "COMMISSION_RATIO"})
         self.is_intialized = True
         self.budget = budget
         self.balance = budget

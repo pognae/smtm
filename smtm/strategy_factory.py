@@ -4,12 +4,21 @@ from .strategy_bnh import StrategyBuyAndHold
 from .strategy_sma_0 import StrategySma0
 from .strategy_rsi import StrategyRsi
 from .strategy_sma_ml import StrategySmaMl
+from .strategy_turtle import StrategyTurtle
+from .strategy_bnf import StrategyBnf
 
 
 class StrategyFactory:
     """Strategy 정보 조회 및 생성을 담당하는 Factory 클래스"""
 
-    STRATEGY_LIST = [StrategyBuyAndHold, StrategySma0, StrategyRsi, StrategySmaMl]
+    STRATEGY_LIST = [
+        StrategyBuyAndHold,
+        StrategySma0,
+        StrategyRsi,
+        StrategySmaMl,
+        StrategyTurtle,
+        StrategyBnf,
+    ]
     LEGACY_CODE = {"0": "BNH", "1": "SMA", "2": "RSI", "3": "SML"}
 
     @staticmethod

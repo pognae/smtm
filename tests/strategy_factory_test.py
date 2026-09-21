@@ -1,5 +1,13 @@
 import unittest
-from smtm import StrategyFactory, StrategyBuyAndHold, StrategySma0, StrategyRsi, StrategySmaMl
+from smtm import (
+    StrategyFactory,
+    StrategyBuyAndHold,
+    StrategySma0,
+    StrategyRsi,
+    StrategySmaMl,
+    StrategyTurtle,
+    StrategyBnf,
+)
 from unittest.mock import *
 
 
@@ -19,6 +27,9 @@ class StrategyFactoryTests(unittest.TestCase):
         self.assertTrue(isinstance(StrategyFactory.create("SMA"), StrategySma0))
         self.assertTrue(isinstance(StrategyFactory.create("RSI"), StrategyRsi))
         self.assertTrue(isinstance(StrategyFactory.create("SML"), StrategySmaMl))
+        self.assertTrue(isinstance(StrategyFactory.create("TUR"), StrategyTurtle))
+        self.assertTrue(isinstance(StrategyFactory.create("BNF"), StrategyBnf))
+        self.assertEqual(StrategyFactory.create("4"), None)
 
     def test_create_return_legacy_code(self):
         self.assertTrue(isinstance(StrategyFactory.create(0), StrategyBuyAndHold))
@@ -46,6 +57,8 @@ class StrategyFactoryTests(unittest.TestCase):
         self.assertTrue(StrategyFactory.get_name("SMA"), StrategySma0.NAME)
         self.assertTrue(StrategyFactory.get_name("RSI"), StrategyRsi.NAME)
         self.assertTrue(StrategyFactory.get_name("SML"), StrategySmaMl.NAME)
+        self.assertEqual(StrategyFactory.get_name("TUR"), StrategyTurtle.NAME)
+        self.assertEqual(StrategyFactory.get_name("bnf"), StrategyBnf.NAME)
 
     def test_get_all_strategy_info_return_correct_info(self):
         all = StrategyFactory.get_all_strategy_info()
@@ -61,3 +74,6 @@ class StrategyFactoryTests(unittest.TestCase):
         self.assertTrue(all[3]["name"], StrategySmaMl.NAME)
         self.assertTrue(all[3]["code"], StrategySmaMl.CODE)
         self.assertTrue(all[3]["class"], StrategySmaMl)
+        self.assertEqual(all[4]["code"], "TUR")
+        self.assertEqual(all[5]["code"], "BNF")
+        self.assertEqual(len(all), 6)

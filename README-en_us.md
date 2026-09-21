@@ -20,6 +20,8 @@ The basic idea is to repeat a simple process of data collection -> algorithmic a
  --- repeat ---
 4. Create analyzing result by the Analyzer module  
 
+Strategy codes are `BNH` (buy and hold), `SMA` (moving-average alignment), `RSI`, `SML` (moving average plus slope), `TUR` (spot Donchian breakout), and `BNF` (buy a drop from the recent high). The default is `BNH`.
+
 ![intro](https://user-images.githubusercontent.com/9311990/140635409-93e4b678-5a6b-40b8-8e28-5c8f819aa88c.jpg)
 
 ❗ It is not suitable for high-performance trading machines that need to process many trades in a short timeframe of seconds, and should be given due consideration if processing time is a critical performance requirement.

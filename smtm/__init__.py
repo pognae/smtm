@@ -13,6 +13,8 @@ from .strategy_bnh import StrategyBuyAndHold
 from .strategy_sma_0 import StrategySma0
 from .strategy_sma_ml import StrategySmaMl
 from .strategy_rsi import StrategyRsi
+from .strategy_turtle import StrategyTurtle
+from .strategy_bnf import StrategyBnf
 from .strategy_factory import StrategyFactory
 from .virtual_market import VirtualMarket
 from .worker import Worker

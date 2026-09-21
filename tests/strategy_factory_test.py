@@ -20,6 +20,23 @@ class StrategyFactoryTests(unittest.TestCase):
         self.assertTrue(isinstance(StrategyFactory.create("RSI"), StrategyRsi))
         self.assertTrue(isinstance(StrategyFactory.create("SML"), StrategySmaMl))
 
+    def test_create_return_legacy_code(self):
+        self.assertTrue(isinstance(StrategyFactory.create(0), StrategyBuyAndHold))
+        self.assertTrue(isinstance(StrategyFactory.create("1"), StrategySma0))
+        self.assertTrue(isinstance(StrategyFactory.create("2"), StrategyRsi))
+        self.assertTrue(isinstance(StrategyFactory.create(3), StrategySmaMl))
+        self.assertEqual(StrategyFactory.get_name("0"), StrategyBuyAndHold.NAME)
+        self.assertEqual(StrategyFactory.get_name(1), StrategySma0.NAME)
+
+    def test_create_keeps_strategy_params_until_initialize(self):
+        strategy = StrategyFactory.create("SMA", params={"short": 5, "mid": 15, "long": 20})
+        self.assertEqual(strategy.SHORT, StrategySma0.SHORT)
+        strategy.initialize(10000)
+        self.assertEqual(strategy.SHORT, 5)
+        self.assertEqual(strategy.MID, 15)
+        self.assertEqual(strategy.LONG, 20)
+        self.assertEqual(StrategySma0.SHORT, 10)
+
     def test_get_name_return_None_when_called_with_invalid_code(self):
         strategy = StrategyFactory.get_name("")
         self.assertEqual(strategy, None)

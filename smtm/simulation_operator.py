@@ -11,8 +11,8 @@ class SimulationOperator(Operator):
     PERIODIC_RECORD_INFO = (360, -1)  # (turn, index) e.g. (360, -1) 최근 6시간
     PERIODIC_RECORD_INTERVAL_TURN = 300
 
-    def __init__(self, periodic_record_enable=False):
-        super().__init__()
+    def __init__(self, periodic_record_enable=False, max_loss=0):
+        super().__init__(max_loss=max_loss)
         self.logger = LogManager.get_logger(__class__.__name__)
         self.turn = 0
         self.budget = 0
@@ -69,6 +69,9 @@ class SimulationOperator(Operator):
 
         self.turn += 1
         self.logger.debug("############# Simulation trading is completed")
+        if self.state == "running" and self._loss_limit_reached():
+            self._halt_trading(f"max loss reached: -{self.max_loss}%")
+            return
         self._start_timer()
 
     def get_score(self, callback, index_info=None, graph_tag=None):

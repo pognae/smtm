@@ -24,6 +24,28 @@ class OperatorInitializeTests(unittest.TestCase):
         self.assertEqual(self.operator.analyzer, self.analyzer_mock)
         self.strategy_mock.initialize.assert_called_once_with("banana", add_spot_callback=ANY)
 
+    def test_initialize_should_sync_account_when_trader_supports_it(self):
+        self.trader_mock.SUPPORTS_ACCOUNT_SYNC = True
+        self.trader_mock.NAME = "Upbit"
+        self.trader_mock.fetch_account.return_value = {"balance": 123, "asset_amount": 0.5}
+        self.strategy_mock.CODE = "BNH"
+        self.operator.initialize(
+            "mango", self.strategy_mock, self.trader_mock, self.analyzer_mock, 500
+        )
+        self.trader_mock.cancel_open_orders.assert_called_once()
+        self.strategy_mock.sync_from_account.assert_called_once_with(123, 0.5)
+        self.assertEqual(self.operator.state, "ready")
+
+    def test_initialize_should_not_be_ready_when_account_sync_failed(self):
+        self.trader_mock.SUPPORTS_ACCOUNT_SYNC = True
+        self.trader_mock.fetch_account.return_value = None
+        self.operator.initialize(
+            "mango", self.strategy_mock, self.trader_mock, self.analyzer_mock, 500
+        )
+        self.assertEqual(self.operator.state, None)
+        self.assertTrue(self.operator.account_sync_failed)
+        self.analyzer_mock.initialize.assert_not_called()
+
     def test_initialize_should_call_analyzer_initialize_with_trader(self):
         self.trader_mock.get_account_info = "orange"
         self.operator.initialize(
@@ -170,13 +192,62 @@ class OperatorExecuteTradingTests(unittest.TestCase):
         self.operator.initialize(
             self.dp_mock, self.strategy_mock, self.trader_mock, self.analyzer_mock, 100
         )
+        self.operator.state = "running"
         self.operator.on_exception = MagicMock()
+        self.operator._periodic_internal_get_score = MagicMock()
 
-        with self.assertRaises(Exception) as exception:
+        self.operator._execute_trading(None)
+
+        self.operator.on_exception.assert_called_once_with(
+            "Something bad happened during trading: mango"
+        )
+        self.assertEqual(self.operator.state, "running")
+        self.assertEqual(self.operator.consecutive_failures, 1)
+        self.timer_mock.start.assert_called_once()
+
+    def test_execute_trading_should_halt_after_consecutive_failures(self):
+        def make_exception():
+            raise Exception("mango")
+
+        self.dp_mock.get_info = make_exception
+        self.operator.initialize(
+            self.dp_mock, self.strategy_mock, self.trader_mock, self.analyzer_mock, 100
+        )
+        self.operator.state = "running"
+        self.operator.on_exception = MagicMock()
+        self.operator._periodic_internal_get_score = MagicMock()
+
+        for _ in range(self.operator.MAX_CONSECUTIVE_FAILURES - 1):
+            self.operator.state = "running"
             self.operator._execute_trading(None)
-        self.assertEqual(str(exception.exception), "Something bad happened during trading")
 
-        self.operator.on_exception.assert_called_once_with("Something bad happened during trading")
+        self.timer_mock.start.reset_mock()
+        self.operator.state = "running"
+        self.operator._execute_trading(None)
+
+        self.assertEqual(self.operator.state, "halted")
+        self.timer_mock.start.assert_not_called()
+        halt_message = self.operator.on_exception.call_args[0][0]
+        self.assertIn("stopped after", halt_message)
+
+    def test_execute_trading_should_halt_when_max_loss_reached(self):
+        self.dp_mock.get_info = MagicMock(return_value="mango")
+        self.strategy_mock.get_request = MagicMock(return_value=None)
+        self.operator.max_loss = 10
+        self.analyzer_mock.score_list = [{"cumulative_return": -10}]
+        self.operator.initialize(
+            self.dp_mock, self.strategy_mock, self.trader_mock, self.analyzer_mock, 100
+        )
+        self.operator.state = "running"
+        self.operator.on_exception = MagicMock()
+        self.operator._periodic_internal_get_score = MagicMock()
+
+        self.operator._execute_trading(None)
+
+        self.assertEqual(self.operator.state, "halted")
+        self.timer_mock.start.assert_not_called()
+        self.operator.on_exception.assert_called_once()
+        self.assertIn("max loss reached", self.operator.on_exception.call_args[0][0])
 
 
 class OperatorStopTests(unittest.TestCase):

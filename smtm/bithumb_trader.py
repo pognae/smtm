@@ -33,6 +33,7 @@ class BithumbTrader(Trader):
     ISO_DATEFORMAT = "%Y-%m-%dT%H:%M:%S"
     AVAILABLE_CURRENCY = {"BTC": ("BTC", "KRW"), "ETH": ("ETH", "KRW")}
     NAME = "Bithumb"
+    SUPPORTS_ACCOUNT_SYNC = True
 
     def __init__(self, budget=50000, currency="BTC", commission_ratio=0.0005, opt_mode=True):
         if currency not in self.AVAILABLE_CURRENCY:
@@ -48,6 +49,7 @@ class BithumbTrader(Trader):
         self.SERVER_URL = os.environ.get("BITHUMB_API_SERVER_URL", "bithumb_server_url")
         self.is_opt_mode = opt_mode
         self.asset = (0, 0)  # avr_price, amount
+        self.budget_limit = budget
         self.balance = budget
         self.commission_ratio = commission_ratio
         currency_info = self.AVAILABLE_CURRENCY[currency]
@@ -168,6 +170,60 @@ class BithumbTrader(Trader):
         orders = copy.deepcopy(self.order_map)
         for request_id in orders.keys():
             self.cancel_request(request_id)
+
+    def cancel_open_orders(self):
+        """이 마켓의 미체결 주문만 취소한다"""
+        response = self._query_open_orders()
+        if response is None or response.get("status") != "0000":
+            self.logger.error("open order query failed")
+            return
+
+        data = response.get("data")
+        if not isinstance(data, list):
+            return
+
+        for order in data:
+            order_id = order.get("order_id")
+            if order_id:
+                self._cancel_order(order_id)
+
+    def fetch_account(self):
+        """거래소 잔고를 읽어 사용 가능한 원화와 코인 수량을 맞춘다
+
+        원화는 budget과 거래소 주문 가능 금액 중 작은 값만 사용한다.
+        조회 실패 시 None.
+        """
+        response = self._query_balance(self.market)
+        if response is None or response.get("status") != "0000":
+            self.logger.error("balance query failed")
+            return None
+
+        data = response.get("data")
+        if not isinstance(data, dict):
+            self.logger.error("invalid balance response")
+            return None
+
+        currency_key = self.market.lower()
+        try:
+            krw = float(data.get("available_krw") or 0)
+            amount = float(data.get(f"available_{currency_key}") or 0)
+        except (TypeError, ValueError) as err:
+            self.logger.error(f"invalid balance data {err}")
+            return None
+
+        self.balance = min(self.budget_limit, krw)
+        self.asset = (0, amount)
+        self.logger.info(f"account synced balance: {self.balance}, asset: {amount}")
+        return {"balance": self.balance, "asset_amount": amount, "avg_price": 0}
+
+    def _query_open_orders(self):
+        """진행 중인 주문을 조회한다"""
+        query = {
+            "order_currency": self.market,
+            "payment_currency": self.market_currency,
+            "count": 1000,
+        }
+        return self.bithumb_api_call("/info/orders", query)
 
     def _execute_order(self, task):
         request = task["request"]

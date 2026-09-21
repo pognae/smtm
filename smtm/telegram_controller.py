@@ -36,7 +36,7 @@ class TelegramController:
     UPBIT_CURRENCY = ["BTC", "ETH", "DOGE", "XRP"]
     BITHUMB_CURRENCY = ["BTC", "ETH"]
 
-    def __init__(self, token=None, chatid=None):
+    def __init__(self, token=None, chatid=None, max_loss=0):
         LogManager.set_stream_level(Config.operation_log_level)
         self.logger = LogManager.get_logger("TelegramController")
         self.post_worker = Worker("Chatbot-Post-Worker")
@@ -61,6 +61,7 @@ class TelegramController:
         self._create_command()
         self.currency = None
         self.is_demo = False
+        self.max_loss = max_loss or 0
         if token is not None:
             self.TOKEN = token
         if chatid is not None:
@@ -340,7 +341,7 @@ class TelegramController:
             def _on_exception(msg):
                 self.on_exception(msg)
 
-            self.operator = Operator(on_exception=_on_exception)
+            self.operator = Operator(on_exception=_on_exception, max_loss=self.max_loss)
             self.operator.initialize(
                 self.data_provider,
                 self.strategy,
@@ -348,6 +349,10 @@ class TelegramController:
                 Analyzer(),
                 budget=self.budget,
             )
+            if getattr(self.operator, "account_sync_failed", False) is True:
+                self._send_text_message("계좌 조회에 실패했습니다. API 키와 거래소 연결을 확인하세요.")
+                self._terminate_start_in_progress()
+                return
             self.operator.set_interval(Config.candle_interval)
             if self.operator.start():
                 start_message = [

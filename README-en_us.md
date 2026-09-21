@@ -76,14 +76,14 @@ python -m smtm --mode 0
 Running a single simulation with the command below with the simulation parameters will return the results.
 
 ```
-python -m smtm --mode 1 --budget 50000 --from_dash_to 201220.170000-201221 --term 0.1 --strategy 0 --currency BTC
+python -m smtm --mode 1 --budget 50000 --from_dash_to 201220.170000-201221 --term 0.1 --strategy BNH --currency BTC
 ```
 
 ### Run controller for trading
 Use the command below to run the default demo trading program with initial values. The demo runs in interactive mode, allowing you to start, stop, and view results based on your inputs.
 
 ```
-python -m smtm --mode 2 --budget 50000 --term 60 --strategy 0 --currency ETH
+python -m smtm --mode 2 --budget 50000 --term 60 --strategy BNH --currency ETH
 ```
 
 for real trading API key and host url is included in `.env` file.
@@ -118,7 +118,7 @@ python -m smtm --mode 4 --config /data/sma0_simulation.json
 Run with a mass simulation configuration file. The configuration file is in JSON format and can be generated directly through a text editor or via a command.
 
 ```
-python -m smtm --mode 5 --budget 50000 --title SMA_6H_week --strategy 1 --currency ETH --from_dash_to 210804.000000-210811.000000 --offset 360 --file generated_config.json
+python -m smtm --mode 5 --budget 50000 --title SMA_6H_week --strategy SMA --currency ETH --from_dash_to 210804.000000-210811.000000 --offset 360 --file generated_config.json
 ```
 
 ## Software Architecture

@@ -20,7 +20,7 @@ class JptController:
     def __init__(
         self,
         interval=10,
-        strategy=0,
+        strategy="BNH",
         budget=50000,
         market="BTC",
         commission_ratio=0.0005,
@@ -35,7 +35,7 @@ class JptController:
         self.need_init = True
         self.logger = LogManager.get_logger("JptController")
 
-    def initialize(self, interval=10, strategy=0, budget=50000, is_bithumb=False):
+    def initialize(self, interval=10, strategy="BNH", budget=50000, is_bithumb=False):
         """설정 값으로 초기화"""
         self.interval = interval
         self.strategy_code = strategy

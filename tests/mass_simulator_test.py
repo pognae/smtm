@@ -164,6 +164,9 @@ class MassSimulatorRunTests(unittest.TestCase):
                             },
                         },
                     ],
+                    "strategy_params": None,
+                    "slippage": 0,
+                    "max_loss": 0,
                 },
                 {
                     "title": "BnH-2Hour",
@@ -181,6 +184,9 @@ class MassSimulatorRunTests(unittest.TestCase):
                             },
                         },
                     ],
+                    "strategy_params": None,
+                    "slippage": 0,
+                    "max_loss": 0,
                 },
             ],
         )

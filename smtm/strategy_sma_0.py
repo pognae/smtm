@@ -341,6 +341,14 @@ class StrategySma0(Strategy):
         if self.is_intialized:
             return
 
+        self.apply_params(
+            {
+                "short": "SHORT",
+                "mid": "MID",
+                "long": "LONG",
+                "commission_ratio": "COMMISSION_RATIO",
+            }
+        )
         self.is_intialized = True
         self.budget = budget
         self.balance = budget

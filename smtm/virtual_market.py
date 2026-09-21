@@ -20,17 +20,26 @@ class VirtualMarket:
 
     URL = "https://api.upbit.com/v1/candles/minutes/1"
 
-    def __init__(self, market="KRW-BTC", interval=60):
+    def __init__(self, market="KRW-BTC", interval=60, slippage_ratio=0):
         self.logger = LogManager.get_logger(__class__.__name__)
         self.repo = DataRepository("smtm.db", interval=interval)
         self.data = None
         self.turn_count = 0
         self.balance = 0
         self.commission_ratio = 0.0005
+        self.slippage_ratio = slippage_ratio or 0
         self.asset = {}
         self.is_initialized = False
         self.market = market
         self.interval = interval
+
+    def _execution_price(self, price, is_buy):
+        """슬리피지가 0이면 요청가를 그대로 반환한다"""
+        if self.slippage_ratio == 0:
+            return price
+        if is_buy:
+            return price * (1 + self.slippage_ratio)
+        return price * (1 - self.slippage_ratio)
 
     def initialize(self, end=None, count=100, budget=0):
         """
@@ -140,15 +149,22 @@ class VirtualMarket:
                 self.logger.info("not matched")
                 return "pass"
 
+            fill_price = self._execution_price(request["price"], True)
+            buy_value = fill_price * request["amount"]
+            buy_total_value = buy_value * (1 + self.commission_ratio)
+            if buy_total_value > self.balance:
+                self.logger.info("no money")
+                return "error!"
+
             name = self.data[next_index]["market"]
             if name in self.asset:
                 asset = self.asset[name]
                 new_amount = asset[1] + request["amount"]
                 new_amount = round(new_amount, 6)
-                new_value = (request["amount"] * request["price"]) + (asset[0] * asset[1])
+                new_value = (request["amount"] * fill_price) + (asset[0] * asset[1])
                 self.asset[name] = (round(new_value / new_amount), new_amount)
             else:
-                self.asset[name] = (request["price"], request["amount"])
+                self.asset[name] = (fill_price, request["amount"])
 
             self.balance -= buy_total_value
             self.balance = round(self.balance)
@@ -156,7 +172,7 @@ class VirtualMarket:
             return {
                 "request": request,
                 "type": request["type"],
-                "price": request["price"],
+                "price": fill_price,
                 "amount": request["amount"],
                 "msg": "success",
                 "balance": self.balance,
@@ -194,14 +210,15 @@ class VirtualMarket:
                     new_amount,
                 )
 
-            sell_value = sell_amount * request["price"]
-            self.balance += sell_amount * request["price"] * (1 - self.commission_ratio)
+            fill_price = self._execution_price(request["price"], False)
+            sell_value = sell_amount * fill_price
+            self.balance += sell_amount * fill_price * (1 - self.commission_ratio)
             self.balance = round(self.balance)
             self.__print_balance_info("sell", old_balance, self.balance, sell_value)
             return {
                 "request": request,
                 "type": request["type"],
-                "price": request["price"],
+                "price": fill_price,
                 "amount": sell_amount,
                 "msg": "success",
                 "balance": self.balance,

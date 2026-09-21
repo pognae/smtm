@@ -10,6 +10,19 @@ class Strategy(metaclass=ABCMeta):
     CODE = "---"
     NAME = "---"
 
+    def apply_params(self, key_to_attr):
+        """params에 있는 값만 인스턴스 속성으로 덮어쓴다. 없으면 클래스 기본값을 유지한다."""
+        params = getattr(self, "params", None) or {}
+        for key, attr in key_to_attr.items():
+            if key in params and params[key] is not None:
+                setattr(self, attr, params[key])
+
+    def sync_from_account(self, balance, asset_amount=0):
+        """거래소 계좌 조회로 전략의 현금과 코인 수량을 맞춘다"""
+        self.balance = balance
+        if hasattr(self, "asset_amount"):
+            self.asset_amount = asset_amount
+
     @abstractmethod
     def initialize(self, budget, min_price=100, add_spot_callback=None):
         """예산을 설정하고 초기화한다

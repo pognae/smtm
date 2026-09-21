@@ -25,8 +25,9 @@ class Operator:
     PERIODIC_RECORD = True
     PERIODIC_RECORD_INFO = (360, -1)  # (turn, index) e.g. (360, -1) 최근 6시간
     PERIODIC_RECORD_INTERVAL_SEC = 300 * 60
+    MAX_CONSECUTIVE_FAILURES = 5
 
-    def __init__(self, on_exception=None):
+    def __init__(self, on_exception=None, max_loss=0):
         self.logger = LogManager.get_logger(__class__.__name__)
         self.data_provider = None
         self.strategy = None
@@ -43,6 +44,9 @@ class Operator:
         self.last_report = None
         self.last_periodic_time = datetime.now()
         self.on_exception = on_exception
+        self.max_loss = max_loss or 0
+        self.consecutive_failures = 0
+        self.account_sync_failed = False
 
     def initialize(self, data_provider, strategy, trader, analyzer, budget=500):
         """
@@ -63,14 +67,79 @@ class Operator:
         self.strategy = strategy
         self.trader = trader
         self.analyzer = analyzer
-        self.state = "ready"
         self.strategy.initialize(budget, add_spot_callback=add_spot_callback)
+        if self._sync_account() is not True:
+            return
+
+        self.state = "ready"
         self.analyzer.initialize(trader.get_account_info)
         self.tag = datetime.now().strftime("%Y%m%d-%H%M%S")
         try:
             self.tag += "-" + self.trader.NAME + "-" + self.strategy.CODE
         except AttributeError as err:
             self.logger.warning(f"can't get additional info form strategy and trader: {err}")
+
+    def _sync_account(self):
+        """실전 트레이더만 미체결을 취소하고 계좌 잔고를 전략에 맞춘다"""
+        if getattr(self.trader, "SUPPORTS_ACCOUNT_SYNC", False) is not True:
+            return True
+
+        cancel_open_orders = getattr(self.trader, "cancel_open_orders", None)
+        if callable(cancel_open_orders):
+            cancel_open_orders()
+
+        fetch_account = getattr(self.trader, "fetch_account", None)
+        account = fetch_account() if callable(fetch_account) else None
+        if account is None:
+            self.logger.error("account sync failed. trading will not start")
+            self.account_sync_failed = True
+            return False
+
+        self.strategy.sync_from_account(account["balance"], account.get("asset_amount", 0))
+        self.logger.info(f"strategy synced with account balance {account['balance']}")
+        return True
+
+    def _loss_limit_reached(self):
+        """누적 수익률이 최대 손실 한도 이하인지 확인한다. 한도가 0이면 비활성."""
+        if self.max_loss <= 0:
+            return False
+
+        score_list = getattr(self.analyzer, "score_list", None)
+        if not score_list:
+            return False
+
+        last = score_list[-1]
+        if not isinstance(last, dict):
+            return False
+
+        cumulative = last.get("cumulative_return")
+        if cumulative is None:
+            return False
+        return cumulative <= -abs(self.max_loss)
+
+    def _halt_trading(self, reason):
+        """워커를 join하지 않고 다음 주문을 멈춘다"""
+        self.logger.error(reason)
+        self.state = "halted"
+        self.is_timer_running = False
+        if self.timer is not None:
+            self.timer.cancel()
+            self.timer = None
+        if self.on_exception is not None:
+            self.on_exception(reason)
+
+    def _note_failure(self, message):
+        """실패를 기록하고, 연속 한도를 넘으면 매매를 멈춘다"""
+        self.consecutive_failures += 1
+        self.logger.error(message)
+        if self.consecutive_failures >= self.MAX_CONSECUTIVE_FAILURES:
+            self._halt_trading(
+                f"stopped after {self.consecutive_failures} consecutive failures: {message}"
+            )
+            return
+
+        if self.on_exception is not None:
+            self.on_exception(message)
 
     def set_interval(self, interval):
         """자동 거래 시간 간격을 설정한다.
@@ -129,6 +198,9 @@ class Operator:
     def _execute_trading(self, task):
         """자동 거래를 실행 후 타이머를 실행한다"""
         del task
+        if self.state != "running":
+            return
+
         self.logger.debug("trading is started #####################")
         self.is_timer_running = False
         try:
@@ -140,11 +212,12 @@ class Operator:
             def send_request_callback(result):
                 self.logger.debug("send_request_callback is called")
                 if result == "error!":
-                    self.logger.error("request fail")
+                    self._note_failure("request fail")
                     return
-                self.strategy.update_result(result)
 
+                self.strategy.update_result(result)
                 if "state" in result and result["state"] != "requested":
+                    self.consecutive_failures = 0
                     self.analyzer.put_result(result)
 
             target_request = self.strategy.get_request()
@@ -152,12 +225,17 @@ class Operator:
             if target_request is not None:
                 self.trader.send_request(target_request, send_request_callback)
                 self.analyzer.put_requests(target_request)
-        except (AttributeError, TypeError) as msg:
-            self.logger.error(f"excuting fail {msg}")
+            else:
+                self.consecutive_failures = 0
         except Exception as exc:
-            if self.on_exception is not None:
-                self.on_exception("Something bad happened during trading")
-            raise RuntimeError("Something bad happened during trading") from exc
+            self._note_failure(f"Something bad happened during trading: {exc}")
+
+        if self.state != "running":
+            return
+
+        if self._loss_limit_reached():
+            self._halt_trading(f"max loss reached: -{self.max_loss}%")
+            return
 
         if self.PERIODIC_RECORD is True:
             self._periodic_internal_get_score()

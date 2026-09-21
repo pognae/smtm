@@ -20,6 +20,7 @@ python -m smtm --mode 5 --budget 50000 --title SMA_2H_week --strategy SMA --curr
 """
 import argparse
 from argparse import RawTextHelpFormatter
+import json
 import sys
 from .simulator import Simulator
 from .controller import Controller
@@ -69,6 +70,18 @@ python -m smtm --mode 5 --budget 50000 --title SMA_6H_week --strategy SMA --curr
     parser.add_argument("--offset", help="mass simulation period offset", type=int, default=120)
     parser.add_argument("--log", help="log file name", default=None)
     parser.add_argument("--demo", help="use demo trader", type=int, default=0)
+    parser.add_argument("--slippage", help="simulation slippage ratio. 0.001 = 0.1%%", type=float, default=0)
+    parser.add_argument(
+        "--max_loss",
+        help="stop when cumulative return <= -max_loss percent. 0 disables",
+        type=float,
+        default=0,
+    )
+    parser.add_argument(
+        "--strategy_params",
+        help='strategy parameter JSON e.g. {"short": 5, "mid": 20, "long": 30}',
+        default=None,
+    )
     parser.add_argument("--token", help="telegram chat-bot token", default=None)
     parser.add_argument("--chatid", help="telegram chat id", default=None)
     parser.add_argument(
@@ -84,6 +97,17 @@ python -m smtm --mode 5 --budget 50000 --title SMA_6H_week --strategy SMA --curr
     )
     parser.add_argument("--version", action="version", version=f'smtm version: {__version__}')
     args = parser.parse_args()
+    strategy_params = None
+    if args.strategy_params:
+        try:
+            strategy_params = json.loads(args.strategy_params)
+        except json.JSONDecodeError:
+            print("invalid --strategy_params JSON")
+            sys.exit(1)
+        if not isinstance(strategy_params, dict):
+            print("--strategy_params must be a JSON object")
+            sys.exit(1)
+
     if args.log is not None:
         LogManager.change_log_file(args.log)
 
@@ -94,6 +118,9 @@ python -m smtm --mode 5 --budget 50000 --title SMA_6H_week --strategy SMA --curr
             strategy=args.strategy,
             currency=args.currency,
             from_dash_to=args.from_dash_to,
+            strategy_params=strategy_params,
+            slippage=args.slippage,
+            max_loss=args.max_loss,
         )
 
     if args.mode == DEFAULT_MODE:
@@ -111,10 +138,13 @@ python -m smtm --mode 5 --budget 50000 --title SMA_6H_week --strategy SMA --curr
             strategy=args.strategy,
             currency=args.currency,
             is_bithumb=args.trader == "1",
+            is_demo=args.demo == 1,
+            strategy_params=strategy_params,
+            max_loss=args.max_loss,
         )
         controller.main()
     elif args.mode == 3:
-        tcb = TelegramController(token=args.token, chatid=args.chatid)
+        tcb = TelegramController(token=args.token, chatid=args.chatid, max_loss=args.max_loss)
         if tcb.TOKEN == "telegram_token" and args.token is None:
             print("Please check your telegram chat-bot token")
             sys.exit(0)

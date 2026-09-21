@@ -39,6 +39,9 @@ class Simulator:
         strategy="BNH",
         from_dash_to="201220.170000-201220.180000",
         currency="BTC",
+        strategy_params=None,
+        slippage=0,
+        max_loss=0,
     ):
         self.logger = LogManager.get_logger("Simulator")
         LogManager.set_stream_level(Config.operation_log_level)
@@ -51,6 +54,9 @@ class Simulator:
         self.budget = int(budget)
         self.need_init = True
         self.currency = currency
+        self.strategy_params = strategy_params
+        self.slippage = slippage or 0
+        self.max_loss = max_loss or 0
 
         self.interval = float(self.interval)
 
@@ -149,19 +155,23 @@ class Simulator:
         end = dt[0][1]
         count = dt[0][2]
 
-        strategy = StrategyFactory.create(self.strategy)
+        strategy = StrategyFactory.create(self.strategy, params=self.strategy_params)
         if strategy is None:
             raise UserWarning(f"Invalid Strategy! {self.strategy}")
 
         strategy.is_simulation = True
-        self.operator = SimulationOperator()
+        self.operator = SimulationOperator(max_loss=self.max_loss)
         self._print_configuration(strategy.NAME)
 
         data_provider = SimulationDataProvider(
             currency=self.currency, interval=Config.candle_interval
         )
         data_provider.initialize_simulation(end=end, count=count)
-        trader = SimulationTrader(currency=self.currency, interval=Config.candle_interval)
+        trader = SimulationTrader(
+            currency=self.currency,
+            interval=Config.candle_interval,
+            slippage_ratio=self.slippage,
+        )
         trader.initialize_simulation(end=end, count=count, budget=self.budget)
         analyzer = Analyzer()
         analyzer.is_simulation = True

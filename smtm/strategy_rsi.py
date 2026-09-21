@@ -48,6 +48,14 @@ class StrategyRsi(Strategy):
         if self.is_intialized:
             return
 
+        self.apply_params(
+            {
+                "rsi_low": "RSI_LOW",
+                "rsi_high": "RSI_HIGH",
+                "rsi_count": "RSI_COUNT",
+                "commission_ratio": "COMMISSION_RATIO",
+            }
+        )
         self.is_intialized = True
         self.budget = budget
         self.balance = budget

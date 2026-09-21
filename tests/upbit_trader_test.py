@@ -1083,3 +1083,44 @@ class UpditTraderBalanceTests(unittest.TestCase):
         self.assertEqual(trader.balance, 550000)
         self.assertEqual(trader.asset, (67000000, 1.000001))
         dummy_callback.assert_called_once_with(dummy_result)
+
+    def test_fetch_account_should_cap_balance_and_keep_coin_amount(self):
+        trader = UpbitTrader(budget=100000, currency="BTC")
+        trader._query_account = MagicMock(
+            return_value=[
+                {"currency": "KRW", "balance": "80000"},
+                {"currency": "BTC", "balance": "0.01", "avg_buy_price": "50000000"},
+            ]
+        )
+        account = trader.fetch_account()
+        self.assertEqual(account["balance"], 80000)
+        self.assertEqual(account["asset_amount"], 0.01)
+        self.assertEqual(account["avg_price"], 50000000)
+        self.assertEqual(trader.balance, 80000)
+        self.assertEqual(trader.asset, (50000000, 0.01))
+
+        trader._query_account = MagicMock(
+            return_value=[
+                {"currency": "KRW", "balance": "900000"},
+                {"currency": "BTC", "balance": "0.2", "avg_buy_price": "1"},
+            ]
+        )
+        account = trader.fetch_account()
+        self.assertEqual(account["balance"], 100000)
+
+    def test_fetch_account_return_None_when_query_failed(self):
+        trader = UpbitTrader()
+        trader._query_account = MagicMock(return_value=None)
+        self.assertEqual(trader.fetch_account(), None)
+
+    def test_cancel_open_orders_should_cancel_only_same_market(self):
+        trader = UpbitTrader(currency="BTC")
+        trader._query_open_orders = MagicMock(
+            return_value=[
+                {"market": "KRW-BTC", "uuid": "btc-1"},
+                {"market": "KRW-ETH", "uuid": "eth-1"},
+            ]
+        )
+        trader._cancel_order = MagicMock()
+        trader.cancel_open_orders()
+        trader._cancel_order.assert_called_once_with("btc-1")
